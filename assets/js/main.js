@@ -14,8 +14,8 @@ import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 const clock = new THREE.Clock();
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x88ccee);
-scene.fog = new THREE.Fog(0x88ccee, 0, 50);
+scene.background = new THREE.Color(0x222222);
+scene.fog = new THREE.Fog(0x222222, 0, 120);
 
 const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.rotation.order = 'YXZ';
@@ -128,6 +128,8 @@ document.addEventListener('keyup', (event) => {
 const vector1 = new THREE.Vector3();
 const vector2 = new THREE.Vector3();
 const vector3 = new THREE.Vector3();
+
+let playerModel = null;
 
 let gameReady = false;
 
@@ -250,7 +252,9 @@ function updatePlayer(deltaTime) {
 
 	playerCollisions();
 
-	camera.position.copy(playerCollider.end);
+	const cameraOffset = new THREE.Vector3(0, 2, 6);
+	camera.position.copy(playerCollider.end).add(cameraOffset);
+	camera.lookAt(playerCollider.end);
 
 }
 
@@ -471,11 +475,15 @@ function controls(deltaTime) {
 
 const loader = new GLTFLoader().setPath('./assets/models/');
 
-loader.load('collision-world.glb', (gltf) => {
+// Mundo de colisiones ligero
+loader.load('collision-world.glb', (collisionGltf) => {
+	worldOctree.fromGraphNode(collisionGltf.scene);
+});
+
+// Mapa visual warehouse
+loader.load('warehouse.glb', (gltf) => {
 
 	scene.add(gltf.scene);
-
-	worldOctree.fromGraphNode(gltf.scene);
 
 	gltf.scene.traverse(child => {
 
@@ -523,6 +531,25 @@ loader.load('collision-world.glb', (gltf) => {
 
 });
 
+
+loader.load('player.glb', (gltf) => {
+
+	playerModel = gltf.scene;
+
+	playerModel.scale.set(1.5, 1.5, 1.5);
+	playerModel.position.set(0, 0, 0);
+
+	playerModel.traverse(child => {
+		if (child.isMesh) {
+			child.castShadow = true;
+			child.receiveShadow = true;
+		}
+	});
+
+	scene.add(playerModel);
+
+});
+
 function teleportPlayerIfOob() {
 
 	if (camera.position.y <= -25) {
@@ -553,6 +580,18 @@ function animate() {
 		updateSpheres(deltaTime);
 
 		teleportPlayerIfOob();
+
+		if (playerModel) {
+			playerModel.position.copy(playerCollider.end);
+			playerModel.position.y -= 1;
+
+			const direction = playerVelocity.clone();
+			direction.y = 0;
+
+			if (direction.lengthSq() > 0.001) {
+				playerModel.rotation.y = Math.atan2(direction.x, direction.z);
+			}
+		}
 
 	}
 
